@@ -157,6 +157,8 @@ return createPortal(
                 fill
                 className="object-contain"
                 priority
+                placeholder="blur"
+                  blurDataURL={item.imageBlur}
               />
             </div>
           ) : (

@@ -60,6 +60,8 @@ export function Gallery({ items }: GalleryProps) {
                 src={item.imageUrl || "/placeholder.svg"}
                 alt={item.title || ""}
                 fill
+                placeholder="blur"
+                blurDataURL={item.imageBlur}
                 className="object-cover transition-all duration-300 group-hover:brightness-110"
               />
             )}
