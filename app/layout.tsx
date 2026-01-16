@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
+import { QueryProvider } from '@/providers/query-provider'
 import './globals.css'
 
 
@@ -63,7 +64,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        {children}
+        <QueryProvider>
+          {children}
+        </QueryProvider>
         <Analytics />
       </body>
     </html>

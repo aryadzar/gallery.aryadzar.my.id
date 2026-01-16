@@ -1,34 +1,82 @@
 "use client"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Play } from "lucide-react"
-import { MediaModal } from "./media-modal"
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { SanityDocument } from "next-sanity"
 import { VideoThumbnail } from "@/lib/thumbnail"
-
-
+import { GallerySkeleton } from "./gallery-skeleton"
+import { useInfiniteQuery } from "@tanstack/react-query"
 
 export interface GalleryProps {
-  items: SanityDocument[]
+  // No props needed - Gallery fetches its own data
 }
 
-export function Gallery({ items }: GalleryProps) {
+export function Gallery() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const selectedId = searchParams.get("media")
   const [hoveredVideo, setHoveredVideo] = useState<string | null>(null)
+  const observerTarget = useRef<HTMLDivElement>(null)
 
   const handleItemClick = (id: string) => {
-    router.push(`/?media=${id}`, { scroll: false })
+    router.push(`/p/${id}`)
   }
 
-  const handleCloseModal = () => {
-    router.push("/", { scroll: false })
+  // Fetch function for infinite query
+  const fetchGalleryItems = async ({ pageParam = 1 }: { pageParam?: number }) => {
+    const response = await fetch(`/api/gallery?page=${pageParam}`)
+    if (!response.ok) {
+      throw new Error("Failed to fetch gallery items")
+    }
+    return response.json()
   }
 
-  const selectedItem = items.find((item) => item._id === selectedId)
-  const selectedIndex = selectedItem ? items.findIndex((item) => item._id === selectedId) : -1
+  // Infinite query hook
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteQuery({
+    queryKey: ["gallery"],
+    queryFn: fetchGalleryItems,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      return lastPage.hasMore ? lastPage.page + 1 : undefined
+    },
+  })
+
+  // Flatten all pages into single array
+  const items = data?.pages.flatMap((page) => page.items) ?? []
+
+  // Set up Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    const currentTarget = observerTarget.current
+    if (currentTarget) {
+      observer.observe(currentTarget)
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget)
+      }
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage])
+
+  // Show initial loading skeleton
+  if (isLoading) {
+    return <GallerySkeleton />
+  }
 
   return (
     <>
@@ -86,14 +134,17 @@ export function Gallery({ items }: GalleryProps) {
         ))}
       </div>
 
-      {selectedItem && (
-        <MediaModal
-          item={selectedItem}
-          items={items}
-          currentIndex={selectedIndex}
-          isOpen={!!selectedId}
-          onClose={handleCloseModal}
-        />
+      {/* Loading trigger for infinite scroll */}
+      <div ref={observerTarget} className="w-full h-20" />
+
+      {/* Loading skeleton when fetching more */}
+      {isFetchingNextPage && <GallerySkeleton />}
+
+      {/* End of gallery message */}
+      {!hasNextPage && items.length > 0 && (
+        <div className="text-center py-12">
+          <p className="text-gray-500">You've reached the end of the gallery</p>
+        </div>
       )}
     </>
   )
